@@ -79,12 +79,38 @@ class TransactionAnalyzer:
         
         return suspicious_travel
     
+    def find_unusual_merchant_patterns(self) -> Dict[str, List[Dict]]:
+        """Identify customers making unusual patterns of purchases across merchant categories."""
+        unusual_patterns = {}
+        
+        # Group by customer
+        for customer_id, transactions in self.df.groupby('customer_id'):
+            # Get merchant categories for this customer
+            merchant_counts = transactions['merchant_category'].value_counts()
+            total_transactions = len(transactions)
+            
+            # Look for customers who make more than 50% of their transactions in high-risk categories
+            high_risk_categories = ['Jewelry', 'Electronics']
+            high_risk_count = sum(merchant_counts[cat] for cat in high_risk_categories 
+                                if cat in merchant_counts)
+            
+            if high_risk_count / total_transactions > 0.5:
+                unusual_patterns[customer_id] = {
+                    'total_transactions': total_transactions,
+                    'high_risk_transactions': high_risk_count,
+                    'merchant_distribution': merchant_counts.to_dict(),
+                    'risk_percentage': (high_risk_count / total_transactions) * 100
+                }
+        
+        return unusual_patterns
+
     def analyze_transactions(self) -> Dict:
         """Run all fraud detection analyses and return results."""
         return {
             'high_value_transactions': self.find_high_value_transactions().to_dict('records'),
             'rapid_transactions': self.find_rapid_transactions(),
-            'impossible_travel': self.find_impossible_travel()
+            'impossible_travel': self.find_impossible_travel(),
+            'unusual_merchant_patterns': self.find_unusual_merchant_patterns()
         }
 
 def main():
@@ -117,6 +143,16 @@ def main():
         print(f"Transaction {travel['transaction1']['id']} in {travel['transaction1']['location']}")
         print(f"Transaction {travel['transaction2']['id']} in {travel['transaction2']['location']}")
         print(f"Time difference: {travel['time_difference'].total_seconds()/60:.1f} minutes")
+    
+    print("\n4. Unusual Merchant Patterns:")
+    for customer_id, pattern in results['unusual_merchant_patterns'].items():
+        print(f"\nCustomer {customer_id}:")
+        print(f"Total transactions: {pattern['total_transactions']}")
+        print(f"High-risk transactions: {pattern['high_risk_transactions']}")
+        print(f"Risk percentage: {pattern['risk_percentage']:.1f}%")
+        print("Merchant category distribution:")
+        for category, count in pattern['merchant_distribution'].items():
+            print(f"  - {category}: {count} transactions")
 
 if __name__ == "__main__":
     main()
